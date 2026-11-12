@@ -28,8 +28,7 @@ models/*
 *.h5
 *.keras
 
-reports/figures/*
-reports/metrics/*
+reports/*
 !reports/figures/.gitkeep
 !reports/metrics/.gitkeep
 
