@@ -2,8 +2,8 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import (
     RandomForestClassifier,
-    GradientBoostingClassifier,
 )
+from xgboost import XGBClassifier
 from sklearn.metrics import (
     accuracy_score,
     precision_score,
@@ -14,14 +14,16 @@ from sklearn.metrics import (
 
 X_train = pd.read_csv("data/processed/X_train_processed.csv")
 X_test = pd.read_csv("data/processed/X_test_processed.csv")
-y_train = pd.read_csv("data/processed/y_train.csv").values.ravel()
-y_test = pd.read_csv("data/processed/y_test.csv").values.ravel()
+
+target_map = {'Low': 0, 'Medium': 1, 'High': 2}
+y_train = pd.read_csv('data/processed/y_train.csv')['Mental_Health_Risk'].map(target_map).values
+y_test = pd.read_csv('data/processed/y_test.csv')['Mental_Health_Risk'].map(target_map).values
 
 
 models = {
     "Logistic Regression": LogisticRegression(max_iter=1000, random_state=42),
     "Random Forest": RandomForestClassifier(random_state=42),
-    "Gradient Boosting": GradientBoostingClassifier(random_state=42),
+    'XGBoost': XGBClassifier(random_state=42, eval_metric='mlogloss')
 }
 
 
