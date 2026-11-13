@@ -7,7 +7,7 @@ with DAG(
     dag_id='student_mental_health_pipeline',
     default_args={'retries': 1, 'retry_delay': timedelta(minutes=5)},
     description='Pipeline end-to-end pour la prédiction du risque de santé mentale des étudiants',
-    schedule_interval=None,
+    schedule=None,
     start_date=datetime(2026, 11, 13),
     catchup=False,
 ) as dag:
