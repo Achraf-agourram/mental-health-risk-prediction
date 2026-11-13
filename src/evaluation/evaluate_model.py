@@ -12,7 +12,6 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import train_test_split
 
-# 1. Charger les données d'entraînement et de test prétraitées
 X_train = pd.read_csv("data/processed/X_train_processed.csv")
 X_test = pd.read_csv("data/processed/X_test_processed.csv")
 
