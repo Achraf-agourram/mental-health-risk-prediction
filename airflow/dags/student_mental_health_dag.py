@@ -14,22 +14,22 @@ with DAG(
 
     preprocess_task = BashOperator(
         task_id='preprocessing_step',
-        bash_command='python -m nbconvert --to notebook --execute --inplace notebooks/spliting_and_preprocessing.ipynb',
+        bash_command='cd /home/achraf/mental-health-risk-prediction && python -m nbconvert --to notebook --execute --inplace notebooks/spliting_and_preprocessing.ipynb',
     )
 
     train_task = BashOperator(
         task_id='train_models_step',
-        bash_command='python -m src.models.train_models',
+        bash_command='cd /home/achraf/mental-health-risk-prediction && python -m src.models.train_models',
     )
 
     optimize_task = BashOperator(
         task_id='optimize_models_step',
-        bash_command='python -m src.models.optimize_models',
+        bash_command='cd /home/achraf/mental-health-risk-prediction && python -m src.models.optimize_models',
     )
 
     evaluate_task = BashOperator(
         task_id='evaluate_model_step',
-        bash_command='python -m src.evaluation.evaluate_model',
+        bash_command='cd /home/achraf/mental-health-risk-prediction && python -m src.evaluation.evaluate_model',
     )
 
     preprocess_task >> train_task >> optimize_task >> evaluate_task
