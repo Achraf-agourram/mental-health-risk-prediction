@@ -1,0 +1,10 @@
+joblib
+jupyter
+matplotlib
+nbconvert
+numpy
+pandas
+scikit-learn
+seaborn
+streamlit
+xgboost
