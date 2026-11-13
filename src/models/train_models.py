@@ -49,10 +49,10 @@ for name, model in models.items():
 
 
 metrics_df = pd.DataFrame(results).T
-metrics_df.to_csv("reports/models_performance_summary.csv", index=True)
+metrics_df.to_csv("reports/metrics/models_performance_summary.csv", index=True)
 
 
 all_reports_df = pd.concat(detailed_reports)
-all_reports_df.to_csv("reports/models_detailed_classification_reports.csv", index=True)
+all_reports_df.to_csv("reports/metrics/models_detailed_classification_reports.csv", index=True)
 
 print("All evaluation reports and summary tables successfully saved !")

@@ -75,7 +75,7 @@ for name, config in models_to_tune.items():
     }
     
 tuned_summary_df = pd.DataFrame(tuned_results).T
-tuned_summary_df.to_csv('reports/tuned_models_performance_summary.csv', index=True)
+tuned_summary_df.to_csv('reports/metrics/tuned_models_performance_summary.csv', index=True)
 
 print("\n=== TUNED MODELS PERFORMANCE COMPARISON ===")
 print(tuned_summary_df)
