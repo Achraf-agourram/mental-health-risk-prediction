@@ -7,7 +7,15 @@ import streamlit as st
 
 
 MODEL_PATH = Path(__file__).resolve().parents[1] / "models" / "best_mental_health_model.joblib"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+REPORTS_PATH = PROJECT_ROOT / "reports"
 RISK_LABELS = {0: "Low", 1: "Medium", 2: "High"}
+PERFORMANCE_METRICS = (
+    "Accuracy",
+    "Precision (Macro)",
+    "Recall (Macro)",
+    "F1-score (Macro)",
+)
 NUMERIC_FEATURES = (
     "Year_of_Study",
     "Sleep_Hours",
@@ -69,90 +77,162 @@ def load_model():
     return model
 
 
+def find_report_file(filename):
+    for path in (REPORTS_PATH / "metrics" / filename, REPORTS_PATH / filename):
+        if path.is_file():
+            return path
+    return None
+
+
+def render_model_performance():
+    st.header("Model performance")
+    st.caption("Evaluation metrics are calculated on the held-out test set.")
+
+    summary_path = find_report_file("models_performance_summary.csv")
+    if summary_path is None:
+        st.error("Model metrics are unavailable. Run `src/models/train_models.py` from the repository root.")
+    else:
+        summary = pd.read_csv(summary_path).rename(columns={"Unnamed: 0": "Model"})
+        missing_metrics = [
+            metric for metric in PERFORMANCE_METRICS if metric not in summary.columns
+        ]
+        if "Model" not in summary.columns or missing_metrics:
+            st.error(f"The model performance report has an unexpected format: `{summary_path}`.")
+        else:
+            summary = summary[["Model", *PERFORMANCE_METRICS]]
+            st.subheader("Comparison across models")
+            st.dataframe(
+                summary.set_index("Model").style.format("{:.1%}"),
+                width="stretch",
+            )
+            st.bar_chart(summary.set_index("Model")[list(PERFORMANCE_METRICS)])
+
+    detailed_path = find_report_file("models_detailed_classification_reports.csv")
+    if detailed_path is not None:
+        detailed = pd.read_csv(detailed_path).rename(columns={"Unnamed: 0": "Class"})
+        class_metrics = ["precision", "recall", "f1-score"]
+        required_columns = ["Class", "Model", *class_metrics]
+        if all(column in detailed.columns for column in required_columns):
+            by_class = detailed[detailed["Class"].isin(RISK_LABELS.values())]
+            if not by_class.empty:
+                st.subheader("Metrics by risk category")
+                by_class = by_class.assign(
+                    Category=by_class["Class"] + " · " + by_class["Model"]
+                )
+                st.bar_chart(by_class.set_index("Category")[class_metrics])
+                st.dataframe(detailed, hide_index=True, width="stretch")
+        else:
+            st.error(f"The per-class report has an unexpected format: `{detailed_path}`.")
+    else:
+        st.info("Per-class metrics are not available yet. Run `src/models/train_models.py` to generate them.")
+
+    confusion_matrix_path = REPORTS_PATH / "figures" / "confusion_matrix.png"
+    st.subheader("Confusion matrix")
+    if confusion_matrix_path.is_file():
+        st.image(
+            str(confusion_matrix_path),
+            caption=(
+                "Logistic Regression on the held-out test set. Actual labels are on "
+                "the vertical axis; predicted labels are on the horizontal axis."
+            ),
+            width="stretch",
+        )
+    else:
+        st.error(
+            "The confusion matrix is unavailable. Run "
+            "`src/evaluation/evaluate_model.py` from the repository root."
+        )
+
+
 st.set_page_config(page_title="Student Mental Health Risk", layout="centered")
 st.title("Student Mental Health Risk")
-st.write(
-    "Enter survey responses to see the model's predicted risk category. "
-    "Age and gender are not used by this model."
-)
+page = st.sidebar.radio("View", ("Risk prediction", "Model performance"))
 
-try:
-    model = load_model()
-except FileNotFoundError:
-    st.error(f"Model file not found: `{MODEL_PATH}`")
-    st.stop()
-
-with st.form("student_survey"):
-    st.subheader("Academic and daily habits")
-    academic_col, sleep_col, study_col = st.columns(3)
-
-    with academic_col:
-        year_of_study = st.selectbox("Year of study", [1, 2, 3, 4, 5])
-        gpa = st.number_input("GPA", 1.5, 4.0, 3.0, step=0.1)
-    with sleep_col:
-        sleep_hours = st.number_input("Sleep per night (hours)", 0.0, 24.0, 7.0, step=0.5)
-        screen_time = st.number_input("Screen time per day (hours)", 0.0, 24.0, 7.0, step=0.5)
-    with study_col:
-        study_hours = st.number_input(
-            "Study per week (hours)", 0.0, 168.0, 20.0, step=1.0
-        )
-        social_media_hours = st.number_input(
-            "Social media per day (hours)", 0.0, 24.0, 4.0, step=0.5
-        )
-
-    st.subheader("Wellbeing and support")
-    activity_col, stress_col, support_col = st.columns(3)
-
-    with activity_col:
-        physical_activity = st.selectbox(
-            "Physical activity", ["Low", "Moderate", "High"]
-        )
-        diet_quality = st.selectbox("Diet quality", ["Poor", "Average", "Good"])
-    with stress_col:
-        financial_stress = st.slider("Financial stress (1–10)", 1.0, 10.0, 5.0, step=0.5)
-        attendance_rate = st.slider("Class attendance (%)", 0.0, 100.0, 85.0, step=1.0)
-    with support_col:
-        family_support = st.slider("Family support (1–10)", 1.0, 10.0, 6.0, step=0.5)
-        part_time_job = st.selectbox("Part-time job", ["No", "Yes"])
-
-    previous_history = st.selectbox(
-        "Previous mental health history", ["No", "Yes"]
+if page == "Risk prediction":
+    st.write(
+        "Enter survey responses to see the model's predicted risk category. "
+        "Age and gender are not used by this model."
     )
-    submitted = st.form_submit_button("Predict risk level", type="primary")
 
-if submitted:
-    responses = {
-        "Year_of_Study": year_of_study,
-        "Sleep_Hours": sleep_hours,
-        "Study_Hours_Per_Week": study_hours,
-        "GPA": gpa,
-        "Social_Media_Hours": social_media_hours,
-        "Screen_Time_Hours": screen_time,
-        "Physical_Activity": physical_activity,
-        "Financial_Stress": financial_stress,
-        "Family_Support": family_support,
-        "Attendance_Rate": attendance_rate,
-        "Part_Time_Job": part_time_job,
-        "Diet_Quality": diet_quality,
-        "Previous_Mental_Health_History": previous_history,
-    }
+    try:
+        model = load_model()
+    except FileNotFoundError:
+        st.error(f"Model file not found: `{MODEL_PATH}`")
+        st.stop()
 
-    features = transform_input(responses)
-    prediction = int(model.predict(features)[0])
-    probabilities = model.predict_proba(features)[0]
-    probability_by_label = {
-        RISK_LABELS[int(label)]: float(probability)
-        for label, probability in zip(model.classes_, probabilities)
-    }
+    with st.form("student_survey"):
+        st.subheader("Academic and daily habits")
+        academic_col, sleep_col, study_col = st.columns(3)
 
-    st.subheader("Prediction")
-    st.metric("Predicted risk category", RISK_LABELS[prediction])
-    st.caption("Model scores by category (not clinical probabilities)")
-    for label in ("Low", "Medium", "High"):
-        st.write(f"**{label}:** {probability_by_label[label]:.1%}")
-        st.progress(probability_by_label[label])
+        with academic_col:
+            year_of_study = st.selectbox("Year of study", [1, 2, 3, 4, 5])
+            gpa = st.number_input("GPA", 1.5, 4.0, 3.0, step=0.1)
+        with sleep_col:
+            sleep_hours = st.number_input("Sleep per night (hours)", 0.0, 24.0, 7.0, step=0.5)
+            screen_time = st.number_input("Screen time per day (hours)", 0.0, 24.0, 7.0, step=0.5)
+        with study_col:
+            study_hours = st.number_input(
+                "Study per week (hours)", 0.0, 168.0, 20.0, step=1.0
+            )
+            social_media_hours = st.number_input(
+                "Social media per day (hours)", 0.0, 24.0, 4.0, step=0.5
+            )
 
-    st.caption(
-        "If you are concerned about your wellbeing, consider speaking with a qualified "
-        "mental health professional or someone you trust."
-    )
+        st.subheader("Wellbeing and support")
+        activity_col, stress_col, support_col = st.columns(3)
+
+        with activity_col:
+            physical_activity = st.selectbox(
+                "Physical activity", ["Low", "Moderate", "High"]
+            )
+            diet_quality = st.selectbox("Diet quality", ["Poor", "Average", "Good"])
+        with stress_col:
+            financial_stress = st.slider("Financial stress (1–10)", 1.0, 10.0, 5.0, step=0.5)
+            attendance_rate = st.slider("Class attendance (%)", 0.0, 100.0, 85.0, step=1.0)
+        with support_col:
+            family_support = st.slider("Family support (1–10)", 1.0, 10.0, 6.0, step=0.5)
+            part_time_job = st.selectbox("Part-time job", ["No", "Yes"])
+
+        previous_history = st.selectbox(
+            "Previous mental health history", ["No", "Yes"]
+        )
+        submitted = st.form_submit_button("Predict risk level", type="primary")
+
+    if submitted:
+        responses = {
+            "Year_of_Study": year_of_study,
+            "Sleep_Hours": sleep_hours,
+            "Study_Hours_Per_Week": study_hours,
+            "GPA": gpa,
+            "Social_Media_Hours": social_media_hours,
+            "Screen_Time_Hours": screen_time,
+            "Physical_Activity": physical_activity,
+            "Financial_Stress": financial_stress,
+            "Family_Support": family_support,
+            "Attendance_Rate": attendance_rate,
+            "Part_Time_Job": part_time_job,
+            "Diet_Quality": diet_quality,
+            "Previous_Mental_Health_History": previous_history,
+        }
+
+        features = transform_input(responses)
+        prediction = int(model.predict(features)[0])
+        probabilities = model.predict_proba(features)[0]
+        probability_by_label = {
+            RISK_LABELS[int(label)]: float(probability)
+            for label, probability in zip(model.classes_, probabilities)
+        }
+
+        st.subheader("Prediction")
+        st.metric("Predicted risk category", RISK_LABELS[prediction])
+        st.caption("Model scores by category (not clinical probabilities)")
+        for label in ("Low", "Medium", "High"):
+            st.write(f"**{label}:** {probability_by_label[label]:.1%}")
+            st.progress(probability_by_label[label])
+
+        st.caption(
+            "If you are concerned about your wellbeing, consider speaking with a qualified "
+            "mental health professional or someone you trust."
+        )
+else:
+    render_model_performance()
