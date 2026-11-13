@@ -38,3 +38,35 @@ print(f"Accuracy : {accuracy_score(y_test, y_pred):.4f}")
 print(f"F1-score (Macro) : {f1_score(y_test, y_pred, average='macro'):.4f}\n")
 print(classification_report(y_test, y_pred, target_names=["Low", "Medium", "High"]))
 
+
+plt.figure(figsize=(6, 5))
+cm = confusion_matrix(y_test, y_pred)
+sns.heatmap(
+    cm,
+    annot=True,
+    fmt="d",
+    cmap="Blues",
+    xticklabels=["Low", "Medium", "High"],
+    yticklabels=["Low", "Medium", "High"],
+)
+plt.title("Matrice de Confusion")
+plt.xlabel("Prédiction")
+plt.ylabel("Réalité")
+plt.tight_layout()
+plt.savefig("reports/figures/confusion_matrix.png", dpi=300)
+plt.show()
+
+
+inv_map = {0: "Low", 1: "Medium", 2: "High"}
+errors_df = X_test_orig.copy()
+errors_df["Actual"] = y_test_orig.values
+errors_df["Predicted"] = pd.Series(y_pred, index=X_test_orig.index).map(inv_map)
+
+misclassified = errors_df[errors_df["Actual"] != errors_df["Predicted"]]
+print(f"\nNombre d'erreurs : {len(misclassified)} / {len(y_test)}")
+print("\nTop des confusions :")
+print(misclassified.groupby(["Actual", "Predicted"]).size().sort_values(ascending=False))
+
+
+joblib.dump(model, "models/best_mental_health_model.joblib")
+print("\nModèle sauvegardé !")
