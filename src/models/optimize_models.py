@@ -42,3 +42,40 @@ models_to_tune = {
     }
 }
 
+
+tuned_results = {}
+best_estimators = {}
+
+for name, config in models_to_tune.items():
+    print(f"\n--- Tuning Hyperparameters for {name} ---")
+    
+    search = RandomizedSearchCV(
+        estimator=config['model'],
+        param_distributions=config['params'],
+        n_iter=10,
+        cv=5,      
+        scoring='f1_macro',
+        random_state=42,
+        n_jobs=-1           
+    )
+    
+    search.fit(X_train, y_train)
+    
+    best_model = search.best_estimator_
+    best_estimators[name] = best_model
+    
+    print(f"Best Parameters: {search.best_params_}")
+    
+    y_pred = best_model.predict(X_test)
+    
+    tuned_results[name] = {
+        'Best CV Score (F1 Macro)': search.best_score_,
+        'Test Accuracy': accuracy_score(y_test, y_pred),
+        'Test F1-score (Macro)': f1_score(y_test, y_pred, average='macro')
+    }
+    
+tuned_summary_df = pd.DataFrame(tuned_results).T
+tuned_summary_df.to_csv('reports/tuned_models_performance_summary.csv', index=True)
+
+print("\n=== TUNED MODELS PERFORMANCE COMPARISON ===")
+print(tuned_summary_df)
