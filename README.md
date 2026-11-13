@@ -82,7 +82,7 @@ After generating the model artifact:
 python -m streamlit run app/streamlit_app.py
 ```
 
-The app accepts the 13 survey features used by the model and displays its predicted category and model scores. Use the sidebar to switch to **Model performance** for aggregate and per-category metrics, comparison charts, and the confusion matrix. It does not collect age or gender.
+The app accepts the 13 survey features used by the model and displays its predicted category and model scores. Use the sidebar to switch to **Model performance** for the saved Logistic Regression model's aggregate and per-category metrics, charts, and confusion matrix. It does not collect age or gender.
 
 ## Optional: Apache Airflow
 

@@ -10,6 +10,7 @@ MODEL_PATH = Path(__file__).resolve().parents[1] / "models" / "best_mental_healt
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 REPORTS_PATH = PROJECT_ROOT / "reports"
 RISK_LABELS = {0: "Low", 1: "Medium", 2: "High"}
+SAVED_MODEL_NAME = "Logistic Regression"
 PERFORMANCE_METRICS = (
     "Accuracy",
     "Precision (Macro)",
@@ -85,12 +86,17 @@ def find_report_file(filename):
 
 
 def render_model_performance():
-    st.header("Model performance")
-    st.caption("Evaluation metrics are calculated on the held-out test set.")
+    st.header("Saved model performance")
+    st.caption(
+        f"Evaluation results for the saved {SAVED_MODEL_NAME} model on the held-out test set."
+    )
 
     summary_path = find_report_file("models_performance_summary.csv")
     if summary_path is None:
-        st.error("Model metrics are unavailable. Run `src/models/train_models.py` from the repository root.")
+        st.error(
+            "Saved model metrics are unavailable. Run "
+            "`src/models/train_models.py` from the repository root."
+        )
     else:
         summary = pd.read_csv(summary_path).rename(columns={"Unnamed: 0": "Model"})
         missing_metrics = [
@@ -99,13 +105,24 @@ def render_model_performance():
         if "Model" not in summary.columns or missing_metrics:
             st.error(f"The model performance report has an unexpected format: `{summary_path}`.")
         else:
-            summary = summary[["Model", *PERFORMANCE_METRICS]]
-            st.subheader("Comparison across models")
-            st.dataframe(
-                summary.set_index("Model").style.format("{:.1%}"),
-                width="stretch",
-            )
-            st.bar_chart(summary.set_index("Model")[list(PERFORMANCE_METRICS)])
+            model_summary = summary[summary["Model"] == SAVED_MODEL_NAME]
+            if model_summary.empty:
+                st.error(
+                    f"The performance report does not contain the saved "
+                    f"{SAVED_MODEL_NAME} model: `{summary_path}`."
+                )
+            else:
+                st.subheader(SAVED_MODEL_NAME)
+                metrics = model_summary.iloc[0]
+                metric_columns = st.columns(len(PERFORMANCE_METRICS))
+                for column, metric in zip(metric_columns, PERFORMANCE_METRICS):
+                    column.metric(metric, f"{metrics[metric]:.1%}")
+
+                chart_data = pd.DataFrame(
+                    {"Score": [metrics[metric] for metric in PERFORMANCE_METRICS]},
+                    index=PERFORMANCE_METRICS,
+                )
+                st.bar_chart(chart_data)
 
     detailed_path = find_report_file("models_detailed_classification_reports.csv")
     if detailed_path is not None:
@@ -113,18 +130,33 @@ def render_model_performance():
         class_metrics = ["precision", "recall", "f1-score"]
         required_columns = ["Class", "Model", *class_metrics]
         if all(column in detailed.columns for column in required_columns):
-            by_class = detailed[detailed["Class"].isin(RISK_LABELS.values())]
+            model_details = detailed[detailed["Model"] == SAVED_MODEL_NAME]
+            by_class = model_details[
+                model_details["Class"].isin(RISK_LABELS.values())
+            ]
             if not by_class.empty:
                 st.subheader("Metrics by risk category")
-                by_class = by_class.assign(
-                    Category=by_class["Class"] + " · " + by_class["Model"]
+                st.bar_chart(by_class.set_index("Class")[class_metrics])
+                display_columns = ["Class", *class_metrics]
+                if "support" in by_class.columns:
+                    display_columns.append("support")
+                st.dataframe(
+                    by_class[display_columns],
+                    hide_index=True,
+                    width="stretch",
                 )
-                st.bar_chart(by_class.set_index("Category")[class_metrics])
-                st.dataframe(detailed, hide_index=True, width="stretch")
+            else:
+                st.error(
+                    f"The per-class report does not contain results for the saved "
+                    f"{SAVED_MODEL_NAME} model: `{detailed_path}`."
+                )
         else:
             st.error(f"The per-class report has an unexpected format: `{detailed_path}`.")
     else:
-        st.info("Per-class metrics are not available yet. Run `src/models/train_models.py` to generate them.")
+        st.info(
+            "Per-class metrics are not available yet. Run "
+            "`src/models/train_models.py` to generate them."
+        )
 
     confusion_matrix_path = REPORTS_PATH / "figures" / "confusion_matrix.png"
     st.subheader("Confusion matrix")
@@ -229,10 +261,5 @@ if page == "Risk prediction":
         for label in ("Low", "Medium", "High"):
             st.write(f"**{label}:** {probability_by_label[label]:.1%}")
             st.progress(probability_by_label[label])
-
-        st.caption(
-            "If you are concerned about your wellbeing, consider speaking with a qualified "
-            "mental health professional or someone you trust."
-        )
 else:
     render_model_performance()
